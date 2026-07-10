@@ -727,33 +727,39 @@ function inicializarRealtime() {
 
     console.log('🔌 Inicializando canais em tempo real...');
 
-    // Escuta novas vendas e atualizações de vendas (Gatilho principal)
+    // 1. Escuta APENAS novas vendas inseridas no banco
     supabaseClient
         .channel('mudancas-vendas')
         .on('postgres_changes', 
-            { event: 'INSERT', schema: 'public', table: 'vendas' }, // Foca apenas em NOVAS vendas
+            { event: 'INSERT', schema: 'public', table: 'vendas' }, 
             async (payload) => {
-                console.log('🔄 Nova venda detectada! Atualizando dados...');
-                await carregarTodosDados(); 
-                
-                console.log('📊 Redesenhando telas e Dashboard com dados novos...');
-                renderizarTudo();           
+                console.log('🔄 Nova venda gravada no Supabase! Atualizando dados...');
+                await carregarTodosDados(); // Busca a lista nova
+                renderizarTudo();           // Redesenha a tela e o Dashboard instantaneamente
             }
         )
         .subscribe();
 
-    // Escuta mudanças de status na tabela caixa_atual (Apenas quando abre ou fecha o caixa)
+    // 2. Escuta mudanças na tabela caixa_atual com proteção contra loop infinito
+    let processandoCaixa = false;
     supabaseClient
         .channel('mudancas-caixa')
         .on('postgres_changes', 
             { event: 'UPDATE', schema: 'public', table: 'caixa_atual' }, 
             async (payload) => {
-                // Evita disparar se o status for igual para cortar o loop involuntário
+                // Se já estiver atualizando agora ou se o status não mudou de verdade, ignora para quebrar o loop
+                if (processandoCaixa) return;
                 if (payload.old && payload.new && payload.old.status === payload.new.status) return;
                 
-                console.log('🔄 Mudança real no status do caixa detectada!');
-                await carregarTodosDados();
-                renderizarTudo();
+                try {
+                    processandoCaixa = true;
+                    console.log('🔄 Mudança de status do caixa detectada! Atualizando...');
+                    await carregarTodosDados();
+                    renderizarTudo();
+                } finally {
+                    // Libera para próximas atualizações reais após 2 segundos
+                    setTimeout(() => { processandoCaixa = false; }, 2000);
+                }
             }
         )
         .subscribe();
