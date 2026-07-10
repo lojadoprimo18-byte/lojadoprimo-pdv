@@ -875,29 +875,29 @@ function renderCaixaAberto() {
     } else {
         sb.innerHTML = c.saidas.map(s => `<tr><td>${s.hora}</td><td>${s.motivo}</td><td class="text-red">${fmt(s.valor)}</td></tr>`).join('');
     }
-    const pags = {};
-    vendasHoje.forEach(v => { pags[v.pagamento] = (pags[v.pagamento] || 0) + v.total; });
-    const nomPag = { dinheiro: '💵 Dinheiro', pix: '📱 Pix', debito: '💳 Débito', credito: '💳 Crédito' };
-    document.getElementById('resumoPagamentosCaixa').innerHTML = Object.entries(pags).map(([k, v]) => `
-        <div class="flex justify-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
-            <span>${nomPag[k]||k}</span><span class="fw-700">${fmt(v)}</span>
-        </div>`).join('') || '<p style="color:var(--text3);padding:8px 0;">Nenhuma venda hoje</p>';
+ const pags = {};
+  vendasHoje.forEach(v => { pags[v.pagamento] = (pags[v.pagamento]||0) + v.total; });
+  const nomPag = {dinheiro:'💵 Dinheiro',pix:'📱 Pix',debito:'💳 Débito',credito:'💳 Crédito'};
+  document.getElementById('resumoPagamentosCaixa').innerHTML = Object.entries(pags).map(([k,v]) => `
+    <div class="flex justify-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+      <span>${nomPag[k]||k}</span><span class="fw-700">${fmt(v)}</span>
+    </div>`).join('') || '<p style="color:var(--text3);font-size:12px;padding:8px 0">Nenhuma venda hoje</p>';
 }
 
 function renderHistoricoCaixas() {
-    const tb = document.getElementById('historicoCaixas');
-    const caixas = [...DB.caixas].reverse();
-    if (caixas.length === 0) { tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text3);">Nenhum caixa</td></tr>'; return; }
-    tb.innerHTML = caixas.map(c => `
-        <tr>
-            <td>${c.dataAbertura}</td>
-            <td>${fmt(c.valorInicial)}</td>
-            <td>${c.valorFinal ? fmt(c.valorFinal) : '-'}</td>
-            <td>${fmt((DB.vendas.filter(v=>v.caixaId===c.id)).reduce((s,v)=>s+v.total,0))}</td>
-            <td class="text-red">${fmt((c.saidas||[]).reduce((s,x)=>s+x.valor,0))}</td>
-            <td>${c.saldo !== undefined ? fmt(c.saldo) : '-'}</td>
-            <td><span class="badge ${c.status==='fechado'?'badge-red':'badge-green'}">${c.status}</span></td>
-        </tr>`).join('');
+  const tb = document.getElementById('historicoCaixas');
+  const caixas = [...DB.caixas].reverse();
+  if (caixas.length === 0) { tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text3)">Nenhum caixa registrado</td></tr>'; return; }
+  tb.innerHTML = caixas.map(c => `
+    <tr>
+      <td>${c.dataAbertura}</td>
+      <td>${fmt(c.valorInicial)}</td>
+      <td>${c.valorFinal ? fmt(c.valorFinal) : '-'}</td>
+      <td>${fmt((DB.vendas.filter(v=>v.caixaId===c.id)).reduce((s,v)=>s+v.total,0))}</td>
+      <td class="text-red">${fmt((c.saidas||[]).reduce((s,x)=>s+x.valor,0))}</td>
+      <td>${c.saldo !== undefined ? fmt(c.saldo) : '-'}</td>
+      <td><span class="badge ${c.status==='fechado'?'badge-red':'badge-green'}">${c.status}</span></td>
+    </tr>`).join('');
 }
 
 async function confirmarAberturaCaixa() {
