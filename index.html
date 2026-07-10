@@ -753,19 +753,6 @@ function inicializarRealtime() {
         )
         .subscribe();
 }
-
-    // Escuta mudanças no status do caixa atual (abrir/fechar caixa)
-    supabaseClient
-        .channel('mudancas-caixa')
-        .on('postgres_changes', 
-            { event: '*', schema: 'public', table: 'caixa_atual' }, 
-            (payload) => {
-                console.log('🔄 Mudança no status do caixa detectada!');
-                carregarTodosDados();
-            }
-        )
-        .subscribe();
-}
    
 // ============================================================
 //  FUNÇÃO SALVAR TUDO (CORRIGIDA E OTIMIZADA)
