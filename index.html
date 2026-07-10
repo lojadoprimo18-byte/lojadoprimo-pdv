@@ -572,13 +572,16 @@ async function conectarSupabase() {
             } catch (e) {}
         }
 
+                // ... final da sua função conectarSupabase()
         await carregarTodosDados();
         renderizarTudo();
+        inicializarRealtime(); // <-- ADICIONE ESTA LINHA AQUI
     } catch (e) {
         console.error(e);
         toast('❌ Erro: ' + e.message, 'error');
     }
 }
+
 
 async function tentarReconectar() {
     const chave = getChave();
@@ -594,6 +597,7 @@ async function tentarReconectar() {
         toast('🔁 Reconectado', 'success');
         await carregarTodosDados();
         renderizarTudo();
+        inicializarRealtime();
         return true;
     } catch (e) {
         console.warn('Reconexão falhou:', e);
@@ -716,6 +720,53 @@ async function carregarTodosDados() {
     }
 }
 
+ // Ative a escuta em tempo real após carregar os dados iniciais
+// Função para monitorar alterações no Supabase em tempo real
+function inicializarRealtime() {
+    if (!supabaseClient) return;
+
+    console.log('🔌 Inicializando canais em tempo real...');
+
+    // Escuta novas vendas e atualizações de vendas
+    supabaseClient
+        .channel('mudancas-vendas')
+        .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'vendas' }, 
+            async (payload) => {
+                console.log('🔄 Nova venda ou alteração detectada! Atualizando tela...');
+                await carregarTodosDados(); // Busca os dados novos do banco
+                renderizarTudo();           // Atualiza os componentes da tela de Caixa
+            }
+        )
+        .subscribe();
+
+    // Escuta mudanças na tabela caixa_atual (abrir/fechar/valores de saldo do caixa)
+    supabaseClient
+        .channel('mudancas-caixa')
+        .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'caixa_atual' }, 
+            async (payload) => {
+                console.log('🔄 Mudança no caixa atual detectada! Atualizando tela...');
+                await carregarTodosDados();
+                renderizarTudo();
+            }
+        )
+        .subscribe();
+}
+
+    // Escuta mudanças no status do caixa atual (abrir/fechar caixa)
+    supabaseClient
+        .channel('mudancas-caixa')
+        .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'caixa_atual' }, 
+            (payload) => {
+                console.log('🔄 Mudança no status do caixa detectada!');
+                carregarTodosDados();
+            }
+        )
+        .subscribe();
+}
+   
 // ============================================================
 //  FUNÇÃO SALVAR TUDO (CORRIGIDA E OTIMIZADA)
 // ============================================================
