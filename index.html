@@ -727,31 +727,31 @@ function inicializarRealtime() {
 
     console.log('🔌 Inicializando canais em tempo real...');
 
-    // Escuta novas vendas e atualizações de vendas
+    // Escuta novas vendas e atualizações de vendas (Gatilho principal)
     supabaseClient
         .channel('mudancas-vendas')
         .on('postgres_changes', 
-            { event: '*', schema: 'public', table: 'vendas' }, 
+            { event: 'INSERT', schema: 'public', table: 'vendas' }, // Foca apenas em NOVAS vendas
             async (payload) => {
-                console.log('🔄 Nova venda detectada! Baixando dados novos...');
-                
-                // 1. ESPERA os dados novos preencherem o objeto DB
+                console.log('🔄 Nova venda detectada! Atualizando dados...');
                 await carregarTodosDados(); 
                 
                 console.log('📊 Redesenhando telas e Dashboard com dados novos...');
-                // 2. Só redesenha depois que o DB estiver atualizado
                 renderizarTudo();           
             }
         )
         .subscribe();
 
-    // Escuta mudanças na tabela caixa_atual
+    // Escuta mudanças de status na tabela caixa_atual (Apenas quando abre ou fecha o caixa)
     supabaseClient
         .channel('mudancas-caixa')
         .on('postgres_changes', 
-            { event: '*', schema: 'public', table: 'caixa_atual' }, 
+            { event: 'UPDATE', schema: 'public', table: 'caixa_atual' }, 
             async (payload) => {
-                console.log('🔄 Mudança no caixa atual detectada! Atualizando...');
+                // Evita disparar se o status for igual para cortar o loop involuntário
+                if (payload.old && payload.new && payload.old.status === payload.new.status) return;
+                
+                console.log('🔄 Mudança real no status do caixa detectada!');
                 await carregarTodosDados();
                 renderizarTudo();
             }
@@ -1727,9 +1727,16 @@ function renderDashboard() {
     const lucro = DB.vendas.reduce((s, v) => s + (v.lucroLiquido || 0), 0);
     const m = document.getElementById('dashMetrics');
     if (!m) return;
-    const hoje = new Date().toLocaleDateString('pt-BR');
-    const vendasHoje = DB.vendas.filter(v => v.data === hoje);
+
+    // --- CORREÇÃO DE FORMATO DE DATA ---
+    const hojeObj = new Date();
+    const hojeBR = hojeObj.toLocaleDateString('pt-BR'); // Formato: 10/07/2026
+    const hojeISO = hojeObj.toISOString().split('T')[0]; // Formato: 2026-07-10
+    
+    // Filtra as vendas aceitando os dois formatos possíveis (BR ou ISO)
+    const vendasHoje = DB.vendas.filter(v => v.data === hojeBR || v.data === hojeISO);
     const fatHoje = vendasHoje.reduce((s, v) => s + v.total, 0);
+
     m.innerHTML = `
         <div class="metric"><div class="metric-label">Faturamento</div><div class="metric-value blue">${fmt(total)}</div><div class="metric-sub">Hoje: ${fmt(fatHoje)}</div></div>
         <div class="metric"><div class="metric-label">Saídas</div><div class="metric-value red">${fmt(saidas)}</div></div>
@@ -1738,7 +1745,8 @@ function renderDashboard() {
         <div class="metric"><div class="metric-label">Vendas</div><div class="metric-value">${DB.vendas.length}</div></div>
         <div class="metric"><div class="metric-label">Produtos</div><div class="metric-value">${DB.produtos.length}</div></div>
     `;
-    // Gráfico 7 dias
+
+    // Gráfico 7 dias corrigido para multiplos formatos
     const bc = document.getElementById('dashBarChart');
     if (bc) {
         const dias = [];
@@ -1746,8 +1754,12 @@ function renderDashboard() {
             const d = new Date();
             d.setDate(d.getDate() - i);
             const label = d.toLocaleDateString('pt-BR', { weekday: 'short' });
-            const dt = d.toLocaleDateString('pt-BR');
-            const val = DB.vendas.filter(v => v.data === dt).reduce((s, v) => s + v.total, 0);
+            
+            const dtBR = d.toLocaleDateString('pt-BR');
+            const dtISO = d.toISOString().split('T')[0];
+
+            // Verifica se a venda bate com qualquer um dos formatos
+            const val = DB.vendas.filter(v => v.data === dtBR || v.data === dtISO).reduce((s, v) => s + v.total, 0);
             dias.push({ label, val });
         }
         const maxV = Math.max(...dias.map(d => d.val), 1);
@@ -1758,6 +1770,7 @@ function renderDashboard() {
                 <span style="font-size:10px;color:var(--text3);">${d.label}</span>
             </div>`).join('');
     }
+
     // Pagamentos
     const pp = document.getElementById('dashPagChart');
     if (pp) {
@@ -1776,6 +1789,7 @@ function renderDashboard() {
                 <span class="fw-700 text-sm" style="min-width:70px;text-align:right;">${(v/totalP*100).toFixed(1)}%</span>
             </div>`).join('') || '<p style="color:var(--text3);">Sem dados</p>';
     }
+
     // Top 10
     const tp = document.getElementById('dashTopProd');
     if (tp) {
@@ -1793,6 +1807,7 @@ function renderDashboard() {
                     </div>
                 </div>`).join('');
     }
+
     // Últimas vendas
     const uv = document.getElementById('dashUltimasVendas');
     if (uv) {
