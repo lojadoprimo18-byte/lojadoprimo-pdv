@@ -733,20 +733,25 @@ function inicializarRealtime() {
         .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'vendas' }, 
             async (payload) => {
-                console.log('🔄 Nova venda ou alteração detectada! Atualizando tela...');
-                await carregarTodosDados(); // Busca os dados novos do banco
-                renderizarTudo();           // Atualiza os componentes da tela de Caixa
+                console.log('🔄 Nova venda detectada! Baixando dados novos...');
+                
+                // 1. ESPERA os dados novos preencherem o objeto DB
+                await carregarTodosDados(); 
+                
+                console.log('📊 Redesenhando telas e Dashboard com dados novos...');
+                // 2. Só redesenha depois que o DB estiver atualizado
+                renderizarTudo();           
             }
         )
         .subscribe();
 
-    // Escuta mudanças na tabela caixa_atual (abrir/fechar/valores de saldo do caixa)
+    // Escuta mudanças na tabela caixa_atual
     supabaseClient
         .channel('mudancas-caixa')
         .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'caixa_atual' }, 
             async (payload) => {
-                console.log('🔄 Mudança no caixa atual detectada! Atualizando tela...');
+                console.log('🔄 Mudança no caixa atual detectada! Atualizando...');
                 await carregarTodosDados();
                 renderizarTudo();
             }
